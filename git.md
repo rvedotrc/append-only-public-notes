@@ -8,15 +8,27 @@ The bits of git that I sometimes struggle to remember / find.
 
 ## Manually adding a blob
 
-`echo hello | git hash-object -w --stdin`
+```shell
+echo hello | git hash-object -w --stdin
+```
 
 Prints the blob id.
 
-Or, `echo hello | git hash-object -w FILE ...` to add existing files.
+Or, to add existing files:
+
+```shell
+git hash-object -w FILE ...
+```
 
 ## Manually creating a tree
 
-The empty tree: `git mktree < /dev/null`
+The empty tree:
+
+```shell
+git mktree < /dev/null
+```
+
+Prints the tree id.
 
 A tree containing a single blob:
 
@@ -28,11 +40,11 @@ TREE
 
 where that's a tab between the blob id and the path.
 
-Prints the tree id.
-
 ## Manually creating a commit
 
-`git commit-tree [-p PARENT ...] [-m MESSAGE] TREE` 
+```shell
+git commit-tree [-p PARENT ...] [-m MESSAGE] TREE
+```
 
 Prints the commit id.
 
@@ -45,7 +57,9 @@ git reset --hard $( git commit-tree HEAD: -m 'Lose all the history' )
 
 ## Ref manipulation
 
-`git update-ref refs/heads/new-branch COMMIT`
+```shell
+git update-ref refs/heads/new-branch COMMIT
+```
 
 ## Ridiculous example
 
