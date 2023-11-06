@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "run": "node dist/index.js",
-    "demo": "node dist/index.js 1 null null undefined true false NaN 0 'BigInt(9)' Math '\"foo\"' '\"foo\"' '[1]' '({x: 1})' 'Symbol.for(\"y\")' 'new Error(\"bang\")' '() => null' 'class C { hello() {} } ; C'",
+    "demo": "node dist/index.js 2 null null undefined true false NaN 0 'BigInt(9)' Math '\"foo\"' '\"foo\"' '[1]' '({x: 1})' 'Symbol.for(\"y\")' 'new Error(\"bang\")' '() => null' 'class C { hello() {} } ; C'",
     "demo2": "node dist/index.js 1 null null undefined",
     "build": "tsc"
   },

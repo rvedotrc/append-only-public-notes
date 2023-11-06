@@ -20,4 +20,4 @@ for (const expr of process.argv.slice(3)) {
 }
 
 const analyser = Analyser.analyse({ maxDepth, rawValues: values })
-console.log({ analyser })
+// console.log({ analyser })

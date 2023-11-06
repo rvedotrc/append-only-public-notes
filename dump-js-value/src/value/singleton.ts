@@ -1,5 +1,6 @@
 import * as util from "util";
 import Value from "./base";
+import {Connection} from "../connection";
 
 export class SingletonValue extends Value<undefined | null | true | false> {
   protected inspect2(): string {
