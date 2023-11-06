@@ -1,4 +1,6 @@
-const maxDepth = 3
+const util = require('util')
+
+const maxDepth = parseInt(process.argv[2] || '3')
 
 const wrap = (text, width) => {
   if (text.length <= width) return text
@@ -35,11 +37,11 @@ const proxyFor = (realNode, type, label) => {
     // edges.push({ from: uniqueIn.id, to: realNode.id, label: 'is' })
   // }
 
-  return addNode({ id: `proxyOut${type}${seq()}`, label, isProxy: true })
+  return addNode({ id: `proxyOut${type}${seq()}`, label, value: realNode.value, isProxy: true })
 }
 
 const functionProto = Reflect.getPrototypeOf(addNode)
-const functionConst = Reflect.constructor(addNode)
+const functionConst = (() => null).constructor
 const nullProto = Reflect.getPrototypeOf({})
 
 const maybeProxyFor = (fromNode, realNode) => {
@@ -56,6 +58,8 @@ const maybeWithLinks = (node, path, depth) => {
   if (node.linksFollowed) return node
   if (depth >= maxDepth) return node
 
+  node.linksFollowed = true
+
   const childNodes = []
   const childNodeFor = (childValue, why) => {
     const found = childNodes.find(childNode => Object.is(childNode.value, childValue))
@@ -68,34 +72,55 @@ const maybeWithLinks = (node, path, depth) => {
 
   const parentNode = node
   const value = parentNode.value
+
+  const childEdges = []
+  const addChildEdge = (childNode, label) => {
+    const found = childEdges.find(e => Object.is(nodes[e.to], childNode))
+    if (found) {
+      found.label += `,\n${label}`
+    } else {
+      const edge = { from: parentNode.id, to: childNode.id, label }
+      childEdges.push(edge)
+      edges.push(edge)
+    }
+  }
+
   let v
 
   v = doCatch(() => Reflect.getPrototypeOf(value))
   if (v.ok) {
-    edges.push({ from: parentNode.id, to: childNodeFor(v.value, 'Reflect.getPrototypeOf').id, label: 'Reflect\nprototype' })
-  }
-
-  v = doCatch(() => Reflect.constructor(value))
-  if (v.ok) {
-    edges.push({ from: parentNode.id, to: childNodeFor(v.value, 'Reflect.constructor').id, label: 'Reflect\nconstructor' })
+    addChildEdge(childNodeFor(v.value, 'Reflect.getPrototypeOf'), 'Reflect.prototype')
   }
 
   v = doCatch(() => value.__proto__)
   if (v.ok) {
-    edges.push({ from: parentNode.id, to: childNodeFor(v.value, '__proto__').id, label: '__proto__' })
+    addChildEdge(childNodeFor(v.value, '__proto__'), '__proto__')
   }
 
   v = doCatch(() => value.constructor)
   if (v.ok) {
-    edges.push({ from: parentNode.id, to: childNodeFor(v.value, 'constructor').id, label: 'constructor' })
+    addChildEdge(childNodeFor(v.value, 'constructor'), 'constructor')
   }
 
   const keys = doCatch(() => Reflect.ownKeys(value))
 
   if (keys.ok) {
-    for (const key of [...keys.value].sort((a, b) => a.toString().localeCompare(b.toString()))) {
+    const listOfKeys = [...keys.value].sort((a, b) => a.toString().localeCompare(b.toString()))
+    // console.log({ p: parentNode.id, n: parentNode.label, listOfKeys })
+
+    for (const key of listOfKeys) {
       // Don't go too far along strings
       if (typeof key === 'string' && parseInt(key) >= 3) continue
+      if (key === 'constructor') continue
+      if (key === '__proto__') continue
+
+      const descriptor = Reflect.getOwnPropertyDescriptor(value, key)
+      console.log({ descriptor })
+
+      // const descriptorNode = addNode({ id: `n${seq()}`, label: `d:${util.inspect(key)}` })
+      // descriptorNode.label += `\nenumerable: ${descriptor.enumerable}`
+      // descriptorNode.label += `\nconfigurable: ${descriptor.configurable}`
+      // addChildEdge(descriptorNode, "d." + util.inspect(key))
 
       const maybeValueUnderKey = doCatch(() => Reflect.get(value, key))
 
@@ -122,19 +147,18 @@ const maybeWithLinks = (node, path, depth) => {
 
       const valueNode = childNodeFor(valueUnderKey, `key ${key.toString()}`)
 
-      edges.push({ from: parentNode.id, to: valueNode.id, label: JSON.stringify(key) })
+      addChildEdge(valueNode, typeof key === 'string' ? JSON.stringify(key) : key.toString())
     }
   }
 
-  node.linksFollowed = true
   return node
 }
 
 const addValueToGraph = (value, path = [], depth = 0) => {
-  if (value === null) return addNode({ id: `null${seq()}`, label: 'null' })
-  if (value === undefined) return addNode({ id: `undefined${seq()}`, label: 'undefined' })
+  if (value === null) return addNode({ id: `null${seq()}`, label: 'null', isProxy: true, value })
+  if (value === undefined) return addNode({ id: `undefined${seq()}`, label: 'undefined', isProxy: true, value })
 
-  console.log(`${depth}   ${JSON.stringify(path)}`)
+  // console.log(`${depth}   ${JSON.stringify(path)}`)
 
   if (typeof value === 'object' || typeof value === 'function') {
     for (const n of Object.values(nodes)) {
@@ -142,13 +166,22 @@ const addValueToGraph = (value, path = [], depth = 0) => {
     }
   }
 
+  // console.log({ value })
+  // console.log({ toString: value.toString })
+  // console.log({ toString2: value.toString?.() })
+  // if (value.toString) console.log({ qq: `${value}` })
+  // if (value.toString) console.log({ S: String(value) })
+  // console.log({ i: util.inspect(value, true, 1) })
+
   const n = addNode({
     value,
     id: `n${seq()}`,
     label: (typeof value === 'string')
       ? wrap(`string: ${JSON.stringify(value)}`, 50)
-      : `${typeof value}: ${value}`,
+      : wrap(`${typeof value}: ${util.inspect(value)}`, 50),
   })
+
+  // console.log({ value, ok: true })
 
   if (Object.is(value, functionConst)) n.label = `well-known value: function constructor\n${n.label}`
   if (Object.is(value, functionProto)) n.label = `well-known value: function proto\n${n.label}`
@@ -182,7 +215,7 @@ const renderDot = () => {
     if (n.label.startsWith('well-known value')) props.fontsize = '24pt'
 
     if (n.isProxy) props.label += `\n(proxy)`
-    else if (!n.linksFollowed) props.label += '\n(truncated)'
+    else if (!n.linksFollowed) props.label += '\n(maximum depth reached)'
 
     if (typeof n.value === 'function') {
       props.shape = 'rect'
@@ -203,9 +236,11 @@ const renderDot = () => {
 }
 
 try {
-  addValueToGraph(Function)
-  require('fs').writeFileSync('dump-value.dot', renderDot())
-  console.log('updated dump-value.dot')
+  process.argv.slice(3).forEach(text => addValueToGraph(eval(text)))
+  console.log(renderDot())
+  // addValueToGraph({ n: 7, s: "foo" })
+  // require('fs').writeFileSync('dump-js-value.dot', renderDot())
+  // console.log('updated dump-js-value.dot')
 } catch (e) {
   console.log({ nodes, edges })
   console.log({ e })
