@@ -3,6 +3,6 @@ import {ObjectValue} from "./object";
 
 export class FunctionValue extends ObjectValue {
   protected inspect2(): string {
-    return `[a function value = ${util.inspect(this.value)}]`;
+    return `[a function value = ${util.inspect(this.value)} with ${this.connections?.length} connections]`;
   }
 }

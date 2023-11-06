@@ -1,11 +1,13 @@
 import Value from "./value/base";
 
 export class Connection {
-  public readonly kind: string
   private readonly _to: WeakRef<Value<unknown>>
 
-  constructor(kind: string, to: Value<unknown>) {
-    this.kind = kind
+  constructor(
+    public readonly kind: string,
+    to: Value<unknown>,
+    public readonly propertyName: string | symbol | undefined = undefined
+  ) {
     this._to = new WeakRef(to)
   }
 

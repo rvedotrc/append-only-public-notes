@@ -1,6 +1,5 @@
 import Value from "./value/base";
 import {builder} from "./value/builder";
-import {Connection} from "./connection";
 
 export interface AnalyserOptions {
   maxDepth?: number
@@ -30,9 +29,7 @@ export class Analyser {
     this.maxDepth = options.maxDepth || 0
 
     for (const rawValue of options.rawValues) {
-      if (this.getValue(rawValue) === undefined) {
-        this.values.push(builder(rawValue))
-      }
+      this.findOrCreateValue(rawValue)
     }
   }
 
@@ -55,6 +52,7 @@ export class Analyser {
       const item = queue.shift() as (typeof queue)[0] | undefined
       if (item === undefined) break
 
+      console.log({ item })
       if (item.value.seen) continue
       item.value.seen = true
 
@@ -63,9 +61,24 @@ export class Analyser {
         continue
       }
 
-      const connections = item.value.findConnections()
+      const connections = item.value.findConnections(v => this.findOrCreateValue(v))
       item.value.connections.push(...connections)
       queue.push(...connections.map(c => ({ value: c.to, depth: item.depth + 1 })))
     }
+
+    console.log({
+      valueCount: this.values.length,
+      connectionCount: this.values.map(v => v.maxDepthReached ? 0 : v.connections.length).reduce((a, b) => a + b, 0),
+      truncatedCount: this.values.filter(v => v.maxDepthReached).length,
+    })
+  }
+
+  private findOrCreateValue(rawValue: unknown): Value<unknown> {
+    const found = this.getValue(rawValue)
+    if (found !== undefined) return found
+
+    const v = builder(rawValue)
+    this.values.push(v)
+    return v
   }
 }
