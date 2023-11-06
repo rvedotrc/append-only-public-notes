@@ -1,9 +1,10 @@
 import * as util from "util";
 
 export default abstract class Value<T> {
-  protected readonly value: T;
+  public readonly value: T;
 
   constructor(value: T) {
+    // console.log({ construct_from: value, caller: new Error('x').stack })
     this.value = value
   }
 
