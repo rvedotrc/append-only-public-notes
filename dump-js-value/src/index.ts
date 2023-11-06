@@ -8,17 +8,16 @@ const usage = (): never => {
 const maxDepth = Number(process.argv[2])
 if (isNaN(maxDepth)) usage()
 
-const analyser = new Analyser({ maxDepth })
+const values: unknown[] = []
 
 for (const expr of process.argv.slice(3)) {
   let value: unknown
   try {
-    value = [eval(expr)]
+    values.push(eval(expr))
   } catch (e) {
     console.error({ e })
   }
-
-  if (value) analyser.addValue(value[0])
 }
 
+const analyser = Analyser.analyse({ maxDepth, rawValues: values })
 console.log({ analyser })
