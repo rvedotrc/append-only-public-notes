@@ -1,4 +1,5 @@
 import {Analyser} from "./analyser";
+import {Grapher} from "./grapher/grapher";
 
 const usage = (): never => {
   process.stderr.write('Usage: dump-js-value MAX_DEPTH EXPRESSION ...\n')
@@ -20,4 +21,5 @@ for (const expr of process.argv.slice(3)) {
 }
 
 const analyser = Analyser.analyse({ maxDepth, rawValues: values })
-// console.log({ analyser })
+const grapher = Grapher.build(analyser.values)
+console.log({ grapher })
