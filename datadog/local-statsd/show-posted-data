@@ -1,0 +1,2 @@
+#!/bin/bash
+jq --raw-input -c 'try fromjson catch empty | [.env.REQUEST_URI, (.body | (.json // .msgpack))]'
