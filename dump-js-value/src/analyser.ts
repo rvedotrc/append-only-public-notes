@@ -1,5 +1,6 @@
-import Value from "./value/base";
-import {builder} from "./value/builder";
+import * as abstract from './abstract'
+import PairCollection from './pairCollection';
+import tryCatch from "./tryCatch";
 
 export interface AnalyserOptions {
   maxDepth?: number
@@ -8,9 +9,11 @@ export interface AnalyserOptions {
 }
 
 export class Analyser {
-  private maxDepth: number;
-  private values: Value<unknown>[] = [];
-  private maxArrayDepth: number | undefined
+  private readonly maxDepth: number;
+  private readonly maxArrayDepth: number | undefined
+  private readonly rawValues: unknown[]
+
+  private readonly values: PairCollection<unknown, abstract.Value>
 
   public static analyse(options: AnalyserOptions): Analyser {
     const a = new Analyser(options)
@@ -27,58 +30,86 @@ export class Analyser {
     }
 
     this.maxDepth = options.maxDepth || 0
+    this.rawValues = options.rawValues
 
-    for (const rawValue of options.rawValues) {
-      this.findOrCreateValue(rawValue)
-    }
-  }
-
-  private getValue(rawValue: unknown): Value<unknown> | undefined {
-    const r = this.values.find(v => {
-      return Object.is(v.value, rawValue);
-    })
-    return r
+    this.values = new PairCollection<unknown, abstract.Value>(
+      (a, b) => Object.is(a, b),
+      (rawValue) => this.buildAbstractValue(rawValue),
+    )
   }
 
   private analyse(): void {
-    const queue = new Array<{
-      value: Value<unknown>,
-      depth: number
-    }>()
+    this.seedValues()
+  }
 
-    queue.push(...this.values.map(value => ({ value, depth: 0 })))
+  private seedValues() {
+    for (const rawValue of this.rawValues) {
+      this.values.findOrCreate(rawValue)
+    }
+  }
 
-    while (true) {
-      const item = queue.shift() as (typeof queue)[0] | undefined
-      if (item === undefined) break
-
-      console.log({ item })
-      if (item.value.seen) continue
-      item.value.seen = true
-
-      if (this.maxDepth !== undefined && item.depth >= this.maxDepth) {
-        item.value.maxDepthReached = true
-        continue
-      }
-
-      const connections = item.value.findConnections(v => this.findOrCreateValue(v))
-      item.value.connections.push(...connections)
-      queue.push(...connections.map(c => ({ value: c.to, depth: item.depth + 1 })))
+  private buildAbstractValue(rawValue: unknown): abstract.Value {
+    const v: abstract.Value = {
+      isWellKnown: false,
+      nameWhateverThatMeans: rawValue.toString(),
+      typeOf: typeof rawValue,
     }
 
-    console.log({
-      valueCount: this.values.length,
-      connectionCount: this.values.map(v => v.maxDepthReached ? 0 : v.connections.length).reduce((a, b) => a + b, 0),
-      truncatedCount: this.values.filter(v => v.maxDepthReached).length,
+    tryCatch(() => {
+      v.objectProperties = {
+        isExtensible: Object.isExtensible(rawValue),
+        isFrozen: Object.isFrozen(rawValue),
+        isSealed: Object.isSealed(rawValue),
+      }
     })
-  }
 
-  private findOrCreateValue(rawValue: unknown): Value<unknown> {
-    const found = this.getValue(rawValue)
-    if (found !== undefined) return found
-
-    const v = builder(rawValue)
-    this.values.push(v)
     return v
   }
+
+
+
+
+  // private analyse(): void {
+  //
+  //
+  //   for (const rawValue of options.rawValues) {
+  //     this._values.findOrCreate(rawValue)
+  //   }
+  //
+  //   const queue = new Array<{
+  //     value: Value,
+  //     depth: number
+  //   }>()
+  //
+  //   queue.push(...this._values.map(value => ({ value, depth: 0 })))
+  //
+  //   while (true) {
+  //     const item = queue.shift() as (typeof queue)[0] | undefined
+  //     if (item === undefined) break
+  //
+  //     console.log({ item })
+  //     if (item.value.seen) continue
+  //     item.value.seen = true
+  //
+  //     if (this.maxDepth !== undefined && item.depth >= this.maxDepth) {
+  //       item.value.maxDepthReached = true
+  //       continue
+  //     }
+  //
+  //     const connections = item.value.findConnections(v => this.findOrCreateValue(v))
+  //     item.value.connections.push(...connections)
+  //     queue.push(...connections.map(c => ({ value: c.to, depth: item.depth + 1 })))
+  //   }
+  //
+  //   console.log({
+  //     valueCount: this._values.length,
+  //     connectionCount: this._values.map(v => v.maxDepthReached ? 0 : v.connections.length).reduce((a, b) => a + b, 0),
+  //     truncatedCount: this._values.filter(v => v.maxDepthReached).length,
+  //   })
+  // }
+  //
+  // public get values(): Array<Value<unknown>> {
+  //   return [...this._values]
+  // }
+
 }
