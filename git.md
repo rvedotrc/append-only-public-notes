@@ -6,6 +6,16 @@ The bits of git that I sometimes struggle to remember / find.
 
 `foo^{tree}` == `foo:`. The tree, of tree-ish `foo`.
 
+### directory-finding
+
+`git rev-parse --show-toplevel` - top directory (fails in a bare repo)
+
+`git rev-parse --git-dir` - usually top directory plus `/.git`
+
+`git rev-parse --show-prefix` - the empty string if you're at the root, `foo/` if you're in the `foo/` directory, and so on
+
+All of the above fail if you're neither in a worktree nor a git directory
+
 ## Manually adding a blob
 
 ```shell
@@ -71,4 +81,20 @@ git update-ref refs/heads/hello $(
     )\thello.txt" | git mktree
   )
 ) && git push origin --force hello:main
+```
+
+## worktrees
+
+In additional worktrees, `.git` isn't a directory, it's a text file:
+
+```shell
+gitdir: /private/tmp/main-checkout/.git/worktrees/my-worktree
+```
+
+That directory is a form of git dir, but without a `config`.
+`./commondir` points to "parent" git dir:
+
+```shell
+$ cat commondir
+../..
 ```
