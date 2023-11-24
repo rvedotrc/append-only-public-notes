@@ -1,0 +1,22 @@
+#!/bin/bash
+jq --raw-input -c --unbuffered '
+  (try fromjson catch empty)
+  | . as $orig
+  | .body.raw
+  | ([
+      split("\n")[]
+      |(try fromjson catch empty)
+  ]) as $decoded
+| { env: $orig.env, body: $decoded }
+
+
+#  (.body.data = (
+#    .body.raw
+#    | (try fromjson catch empty)
+#     | type
+#    | (
+#      try (fromjson | { ok: true, data: .})
+#       catch ({ok:false, error: .})
+#    )
+#  ))
+'

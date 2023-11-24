@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+ENV['PORT'] = '8500' unless ENV.key?('PORT')
+
+require 'json'
+require 'msgpack'
+require 'sinatra'
+
+$stdout.sync = true
+disable :show_exceptions
+
+post('/*') do
+  begin
+    body =
+      if request.request_method == "POST"
+        body = request.body.read
+        case request.content_type
+        when "application/msgpack"
+          { msgpack: MessagePack.unpack(body) }
+        when "application/json"
+          { json: JSON.parse(body) }
+        else
+          { raw: body.encode("utf-8", invalid: :replace, undef: :replace) }
+        end
+      end
+
+    puts JSON.generate({
+      body: body,
+      env: request.env.select {|k| k.match?(/^[A-Z]/) },
+    })
+  rescue => e
+    puts e
+  end
+
+  # [404, {}, "no\n"]
+  ""
+end
+
+get('/*') do
+  puts JSON.generate({
+    body: nil,
+    env: request.env.select {|k| k.match?(/^[A-Z]/) },
+  })
+
+  ""
+end
