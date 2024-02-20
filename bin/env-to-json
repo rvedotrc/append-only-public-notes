@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+
+# Shows the environment in a diff-friendly form.
+
+# Can be useful for seeing the effect on the environment of some command, e.g.:
+#   diff -u <( env-to-json ) <( direnv exec . env-to-json )
+
+data = ENV.entries.sort_by(&:first).to_h do |k, v|
+  v = v.split(':', -1) if v.chars.count(':') > 2
+  [k, v]
+end
+
+require 'json'
+puts JSON.pretty_generate(data)
