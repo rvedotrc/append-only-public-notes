@@ -1,0 +1,61 @@
+-- given
+-- in
+-- of
+-- with
+-- without
+-- save
+
+-- on foo(a, b)
+--   return 7
+-- end
+
+-- "every attribute"
+-- "every window"
+
+-- Variable assignment
+-- local x
+-- set x to "abc" & "def"
+
+-- String concat
+-- log "abc" & "def"
+
+-- set x to ["j", 7, {a: 9}, true, false, null]
+
+set indent to ""
+tell application "System Events" to tell process "GlobalProtect"
+    log [indent, me] -- me == script
+    set x to name
+    log [indent, x]
+
+    log [indent, "", "windows"]
+    set listx to every window
+    repeat with itemx in listx
+        log [indent, "  ", itemx]
+    end
+
+    log [indent, "", "menus"]
+    set listx to every menu
+    repeat with itemx in listx
+        log [indent, "  ", itemx]
+    end
+
+    log [indent, "", "menu bars"]
+    set listx to every menu bar
+    repeat with itemx in listx
+        log [indent, "  ", itemx]
+        log itemx.name
+
+        log [indent, "    ", "items"]
+        set list2 to every menu bar item of itemx
+        repeat with i in list2
+          log [indent, "      ", i]
+        end
+    end
+
+    log [indent, "", "attributes"]
+    set listx to every attribute
+    repeat with itemx in listx
+        log [indent, "  ", itemx]
+    end
+end
+
