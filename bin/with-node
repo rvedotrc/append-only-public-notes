@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [ "$1" = - ] ; then
+        if [ -f .nvmrc ] ; then
+                version=$( cat .nvmrc )
+        elif [ -f .node-version ] ; then
+                version=$( cat .node-version )
+        else
+                echo "Expected to find .node-version or .nvmrc but they are missing" >&2
+                exit 2
+        fi
+else
+        version="$1"
+fi
+
+shift
+
+version=v${version/v}
+
+dir="$HOME/.nvm/versions/node/$version/bin"
+if [ ! -d "$dir" ] ; then
+        echo "Expected to find $dir but it is missing" >&2
+
+        if [ -t 0 -a -t 1 ] ; then
+                read -p "Press enter to try to install it: "
+
+                (
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$( brew --prefix )/opt/nvm/nvm.sh" ] && . "$( brew --prefix )/opt/nvm/nvm.sh"  # This loads nvm
+                        nvm install $version
+                )
+
+                if [ ! -d "$dir" ] ; then
+                        echo "Expected to find $dir but it is missing" >&2
+                        exit 2
+                fi
+
+                (
+                        export PATH="$dir:$PATH"
+                        npm install -g npm
+                        npm install -g node-gyp
+                        npm install -g yarn
+                )
+        else
+                exit 2
+        fi
+
+fi
+
+export PATH="$dir:$PATH"
+export NVM_DIR="$HOME/.nvm"
+
+exec "$@"
+
+##############

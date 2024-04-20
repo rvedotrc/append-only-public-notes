@@ -1,0 +1,141 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'open3'
+
+def analyse(work_tree)
+  text, status = Open3.capture2('git symbolic-ref HEAD', chdir: work_tree)
+  raise "Can't read HEAD" unless status.success?
+  head = text.chomp
+
+  text, status = Open3.capture2('git remote', chdir: work_tree)
+  raise "Can't read remotes" unless status.success?
+  remotes = text.lines.map(&:chomp)
+
+  text, status = Open3.capture2('git show-ref', chdir: work_tree)
+  raise "Can't read refs" unless status.success?
+  all_refs = text.lines.map(&:chomp)
+
+  text, status = Open3.capture2('git', 'status', '--ignored', '--porcelain=v1', '-z', chdir: work_tree)
+  raise "Can't read status" unless status.success?
+  git_status = text.chomp("\0").split("\0")
+  git_status_by_kind = git_status.group_by { |st| st[0...3] }
+  clean = (git_status_by_kind.keys - ["!! ", "?? "]).empty?
+
+  # TODO: check for ahead / behind / split compared to origin
+
+  if !clean
+    puts "Dirty: #{work_tree} (#{git_status_by_kind.transform_values(&:length).inspect})"
+    return
+  end
+
+  if remotes.length != 1
+    puts "Multiple remotes: #{work_tree}" if remotes.length > 1
+    return
+  end
+
+  remote = remotes.first
+
+  maybe_default_branch = %w[latest main master].map do |name|
+    ours = all_refs.grep(/^\S+ refs\/heads\/#{name}$/).first
+    theirs = all_refs.grep(/^\S+ refs\/remotes\/#{remote}\/#{name}$/).first
+    next unless ours && theirs
+
+    {
+      ours: { commit: ours.split(' ').first, ref: ours.split(' ').last },
+      theirs: { commit: theirs.split(' ').first, ref: theirs.split(' ').last },
+    }
+  end.compact
+
+  if maybe_default_branch.length != 1
+    raise "Bad candidates for default branch: #{maybe_default_branch.inspect}"
+  end
+
+  default_branch = maybe_default_branch.first
+
+  [default_branch[:ours], default_branch[:theirs]].each do |info|
+    commit = info[:commit]
+    ref = info[:ref]
+
+    if !system("git", "reflog", "exists", "--", ref, chdir: work_tree)
+      puts "Forcing creation of a reflog for #{work_tree} #{ref}"
+      system("git", "update-ref", "-d", "--", ref, commit, chdir: work_tree)
+      system("git", "update-ref", "--create-reflog", "-m", "repo-cleanliness", "--", ref, commit, chdir: work_tree)
+    end
+
+    if !system("git", "reflog", "exists", "--", ref, chdir: work_tree)
+      raise "No reflog for #{ref}"
+    end
+  end
+
+  our_time, their_time = [:ours, :theirs].map do |key|
+    text, status = Open3.capture2(
+      'git', 'reflog', '--date=raw', '-n', '1',
+      # '--', breaks it
+      default_branch[key][:ref].sub("refs/", ""),
+      chdir: work_tree
+    )
+    raise "Can't read reflog for #{default_branch[key][:ref]}" unless status.success?
+    time = text[/^.*?@\{(\d+) [+-]?\d\d\d\d\}/, 1]
+    time or raise "Can't extract time from #{text.inspect} for #{default_branch[key][:ref]} in #{work_tree}"
+    time.to_i
+  end
+
+  now = Time.now.to_i
+
+  if now - their_time > 86400 * 2
+    text, status = Open3.capture2(
+      'git', 'fetch', '--porcelain', remote,
+      default_branch[:theirs][:ref].sub("refs/remotes/#{remote}/", ""),
+      chdir: work_tree
+    )
+    raise "Can't fetch" unless status.success?
+
+    # Multiple lines of the form:
+    # [maybe *] space old-sha new-sha refname [such as FETCH_HEAD or refs/remotes/origin/master] newline
+    updates = text.lines.map do |line|
+      if (m = line.match(/^([\* ]) (\w+) (\w+) (.*)$/))
+        { star: m[1] == '*', old_commit: m[2], new_commit: m[3], ref: m[4] }
+      else
+        raise "Can't parse fetch porcelain output #{line.inspect}"
+      end
+    end
+
+    updates.each do |update|
+      if update[:ref] == default_branch[:theirs][:ref]
+        puts "Updating our copy"
+        default_branch[:theirs][:commit] = update[:new_commit]
+      end
+    end
+  end
+
+  if default_branch[:ours][:commit] != default_branch[:theirs][:commit]
+    if system("git", "merge-base", "--is-ancestor", default_branch[:ours][:commit], default_branch[:theirs][:commit], chdir: work_tree)
+      if head == default_branch[:ours][:ref]
+        system(
+          "git", "merge", "--quiet", "--ff-only", default_branch[:theirs][:commit],
+          chdir: work_tree
+        ) or raise "git merge failed"
+      else
+        puts "TODO: we can ff to match #{remote}: #{work_tree}; we are on #{head}"
+      end
+    elsif system("git", "merge-base", "--is-ancestor", default_branch[:theirs][:commit], default_branch[:ours][:commit], chdir: work_tree)
+      puts "we are ahead of #{remote}: #{work_tree}"
+    else
+      puts "we have diverged from #{remote}!!!: #{work_tree}"
+    end
+  end
+end
+
+# What this actually finds is work trees, i.e. directories
+# containing a ".git" subdirectory
+# paths = `find-git-repos $HOME/git/github.com/zdrve $HOME/git/github.com/rvedotrc`.lines.map(&:chomp).sort
+paths = `find-git-repos $HOME/git`.lines.map(&:chomp).sort
+
+paths.each do |work_tree|
+  begin
+    analyse(work_tree)
+  rescue => e
+    puts "Error analysing #{work_tree}: #{e}"
+  end
+end

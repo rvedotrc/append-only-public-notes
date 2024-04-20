@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+
+ENV['PATH'] = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+
+ENV.keys.each do |key|
+        ENV.delete(key) if key.start_with?('rvm')
+end
+
+ENV.delete 'GEM_HOME'
+ENV.delete 'GEM_PATH'
+ENV.delete 'IRBRC'
+ENV.delete 'MY_RUBY_HOME'
+ENV.delete 'RUBY_VERSION'
+
+#bad_re = /ruby|rvm|gem|irb/i
+#if ENV.inspect.match(bad_re)
+#  puts "Failed to clean environment:"
+#  ENV.entries.sort_by(&:first).each do |k, v|
+#    if k.match(bad_re) || v.match(bad_re)
+#      puts "  #{k}=#{v}"
+#    end
+#  end
+#  exit 1
+#end
+
+exec *ARGV
+raise $?

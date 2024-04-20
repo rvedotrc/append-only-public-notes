@@ -1,0 +1,129 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+# For a given mergeable (in terms of the tree) PR, show which
+# other PRs (against the default branch) would become unmergeable.
+
+# Assumes that github is 'origin'. Not secure against
+# shell-special characters in branch names.
+
+pr_spec = ARGV.first
+pr_spec or abort "Usage: what-if-i-merged PR-NUMBER-OR-URL"
+
+system "git fetch origin"
+$?.success? or abort
+
+repo = JSON.parse(`gh repo view --json defaultBranchRef`)
+default_branch = repo.dig("defaultBranchRef", "name")
+
+# At the moment we only deal with PRs merging into the default branch,
+# so that's the only one we need to resolve to a commit.
+repo_head_oid = `git rev-parse refs/remotes/origin/#{default_branch}`.chomp
+abort "git rev-parse failed" if !$?.success?
+
+puts "HEAD: #{repo_head_oid}"
+
+fetch_limit = 200
+prs = JSON.parse(`gh pr list --limit #{fetch_limit} --base #{default_branch} --json 'headRefName,headRefOid,number,url,author,title,isDraft'`)
+warn "Got #{fetch_limit} PRs, there may be more" if prs.count == fetch_limit
+
+if pr_spec == "--all"
+
+  # Could persist this
+  cache = Hash.new do |h, k|
+    commit0, commit1 = k
+
+    file = "cache.#{commit0}.#{commit1}.merge.json"
+    next h[k] = JSON.parse(File.read(file), symbolize_names: true) if File.exist?(file)
+
+    # print "#{k} "
+
+    merged_tree = `git merge-tree --write-tree #{commit0} #{commit1}`.chomp
+    unless $?.success?
+      # puts "CONFLICT"
+      # puts merged_tree
+      r = { mergeable: false }
+      File.write(file, JSON.generate(r))
+      next h[k] = r
+    end
+
+    # These arbitrary dates are to avoid creating _different_ commits every time
+    # this script is run, i.e. it just reduces the impact.
+    merge_commit = `env GIT_AUTHOR_DATE="2005-04-07T22:13:13.019" GIT_COMMITTER_DATE="2005-04-07T22:13:13.019" git commit-tree -m . -p #{commit0} -p #{commit1} #{merged_tree}`.chomp
+    $?.success? or abort
+
+    # puts "#{merged_tree} #{merge_commit}"
+    r = { mergeable: true, merged_tree: merged_tree, merge_commit: merge_commit }
+    File.write(file, JSON.generate(r))
+    next h[k] = r
+  end
+
+  prs.each do |pr|
+    commit = pr.fetch("headRefOid")
+
+    key = [repo_head_oid, commit].sort
+    r = cache[key]
+
+    puts "HEAD <- #{pr.fetch("number")} #{pr.fetch("isDraft") ? "D" : " "} #{pr.fetch("author").fetch("login")} #{pr.fetch("title").inspect} #{r.inspect}"
+  end
+
+  mergeable_prs = prs.select do |pr|
+    cache[[repo_head_oid, pr.fetch("headRefOid")].sort][:mergeable]
+  end
+
+  puts prs.count
+  puts mergeable_prs.count
+  puts mergeable_prs.combination(2).count
+
+  prs.combination(2).each do |pr_a, pr_b|
+    commit_a = pr_a.fetch("headRefOid")
+    commit_b = pr_b.fetch("headRefOid")
+
+    head_and_a = cache[[repo_head_oid, commit_a].sort]
+    head_and_b = cache[[repo_head_oid, commit_b].sort]
+    next unless head_and_a[:mergeable] && head_and_b[:mergeable]
+
+    # (head <- pr_a) <- pr_b
+    r = cache[[head_and_a[:merge_commit], commit_b].sort]
+    puts "HEAD <- #{pr_a.fetch("number")} #{pr_a.fetch("isDraft") ? "D" : " "} #{pr_a.fetch("author").fetch("login")} #{pr_a.fetch("title").inspect} <- #{pr_b.fetch("number")} #{pr_b.fetch("isDraft") ? "D" : " "} #{pr_b.fetch("author").fetch("login")}  #{pr_b.fetch("title").inspect} #{r.inspect}"
+
+    # (head <- pr_b) <- pr_a
+    # cache[[head_and_b[:merge_commit], commit_a].sort]
+    # puts "HEAD <- #{pr_b.fetch("number")} <- #{pr_a.fetch("number")} #{r.inspect}"
+  end
+else
+  pr_to_merge = prs.find { |pr| pr.fetch("number").to_s == pr_spec || pr.fetch("url") == pr_spec }
+  pr_to_merge or abort "Can't find open PR (against the default branch) #{pr_spec}"
+
+  branch_to_merge = pr_to_merge.fetch("headRefName")
+  proposed_new_tree = `git merge-tree --write-tree origin/#{default_branch} origin/#{branch_to_merge}`.chomp
+  abort "#{branch_to_merge} is not mergeable" if !$?.success?
+
+  # These arbitrary dates are to avoid creating _different_ commits every time
+  # this script is run, i.e. it just reduces the impact.
+  proposed_new_head = `env GIT_AUTHOR_DATE="2005-04-07T22:13:13.019" GIT_COMMITTER_DATE="2005-04-07T22:13:13.019" git commit-tree -m . -p origin/#{default_branch} -p origin/#{branch_to_merge} #{proposed_new_tree}`.chomp
+  $?.success? or abort
+
+  prs.each do |pr|
+    next if pr == pr_to_merge
+
+    branch_to_consider = pr.fetch("headRefName")
+    if $stdout.tty?
+      $stdout.write "\r#{branch_to_consider}\e[0K"
+    end
+
+    system "git merge-tree --write-tree origin/#{default_branch} origin/#{branch_to_consider} > /dev/null"
+    can_merge_now = $?.success?
+
+    system "git merge-tree --write-tree #{proposed_new_head} origin/#{branch_to_consider} > /dev/null"
+    can_merge_after = $?.success?
+
+    if can_merge_now && !can_merge_after
+      $stdout.write "\r\e[0K" if $stdout.tty?
+      puts "#{pr.fetch("url")}\t#{pr.fetch("title")}#{" (draft)" if pr.fetch("isDraft")}"
+    end
+  end
+
+  $stdout.write "\r\e[0K" if $stdout.tty?
+end

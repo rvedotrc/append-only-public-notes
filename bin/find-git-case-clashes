@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+
+files = `git ls-files -z`.split("\0")
+dirs = files; while true ; to_add = dirs.map { |p| File.dirname(p) } - dirs; break if to_add.empty?; dirs += to_add ; end
+bad = dirs.group_by(&:downcase).transform_values(&:uniq).select {|k, v| v.length > 1}
+exit if bad.empty?
+p bad
+exit 1

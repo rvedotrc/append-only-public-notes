@@ -1,0 +1,35 @@
+#!/usr/bin/ruby
+
+require 'json'
+
+# Also requires a configured (i.e. with auth) copy of `gh`, the github cli
+# Also you may wish to do a `git fetch` beforehand
+# Also assumes the remote is called 'origin'
+
+# Contains various shell-quoting bugs
+
+# Limited to 200 open PRs
+
+# List open PRs in the given repo, that don't have the given commit as an ancestor
+# (i.e. if commit is important, they should be rebased)
+org, repo, commit = ARGV
+
+pulls = JSON.parse(`gh pr list --repo #{org}/#{repo} --limit 200 --json 'url,author,title,headRepositoryOwner,headRepository,headRefName'`)
+
+# Only those where the head is also in this repo
+pulls.select! do |pull|
+  pull.dig("headRepositoryOwner", "login") == org \
+    and pull.dig("headRepository", "name") == repo
+end
+
+pulls.each do |pull|
+  system "git merge-base --is-ancestor #{commit} origin/#{pull.dig("headRefName")}"
+
+  unless $?.success?
+    puts [
+      pull.dig("url"),
+      "@#{pull.dig("author", "login")}",
+      pull.dig("title"),
+    ].join("\t")
+  end
+end

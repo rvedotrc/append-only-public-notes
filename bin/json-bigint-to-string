@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+def fixup(data)
+  case data
+  when Integer
+    if data.to_s.length > 8
+      data.to_s
+    else
+      data
+    end
+  when Array
+    data.map {|v| fixup(v)}
+  when Hash
+    data.each_entry.map {|k, v| [k, fixup(v)]}.to_h
+  else
+    data
+  end
+end
+
+$stdin.each_line do |line|
+  puts JSON.generate(fixup(JSON.parse(line)))
+end

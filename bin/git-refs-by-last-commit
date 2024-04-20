@@ -1,0 +1,2 @@
+#!/bin/bash
+exec env TZ=UTC git for-each-ref --format='%(committerdate:iso-local) %(objectname) %(refname)' "$@"

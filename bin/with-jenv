@@ -1,0 +1,26 @@
+#!/bin/bash
+
+if [ "$1" = - ] ; then
+        version=$( cat .java-version )
+else
+        version="$1"
+fi
+
+shift
+
+# Troubleshooting:
+# ls -l ~/.jenv/versions
+# ls -l ~/.jenv/versions/*
+# eval "$( jenv init - )"
+# jenv rehash (didn't work for me just now)
+
+# rm -rf ~/.jenv/versions/ ; mkdir ~/.jenv/versions/
+# ln -s /opt/homebrew/Cellar/openjdk@11/11.0.22 ~/.jenv/versions/11.0.22
+# ln -s /opt/homebrew/Cellar/openjdk@11/11.0.22 ~/.jenv/versions/11.0
+# ln -s /opt/homebrew/Cellar/openjdk@11/11.0.22 ~/.jenv/versions/11
+
+export PATH="$HOME/.jenv/bin:$PATH"
+eval "$(jenv init -)"
+jenv shell "$version"
+
+exec "$@"

@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+
+rbenv_dir = '/Users/revans/git/github.com/rbenv/rbenv'
+
+ENV['PATH'] = "#{rbenv_dir}/bin:#{ENV['PATH']}"
+
+require 'tempfile'
+Tempfile.open('rbenv-init') do |f|
+  system "rbenv", "init", "-", out: f
+  $?.success? or raise "rbenv init failed (#{$?})"
+  f.rewind
+  system 'bash', '--rcfile', f.path
+end
+
+# rbenv install --list

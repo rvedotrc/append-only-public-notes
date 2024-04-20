@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+require 'shellwords'
+add_export = (ARGV[0] == "-e")
+ENV.each do |k,v|
+  print "export " if add_export
+  puts "#{Shellwords.shellescape(k)}=#{Shellwords.shellescape(v)}"
+end

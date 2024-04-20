@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'yaml'
+
+if ARGV.empty?
+  puts JSON.generate(YAML.load_stream($stdin.read))
+else
+  ARGV.each do |f|
+    puts JSON.generate([f, YAML.load_stream(File.read(f)) ])
+  end
+end

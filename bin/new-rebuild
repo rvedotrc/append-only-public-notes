@@ -1,0 +1,285 @@
+#!/usr/bin/env ruby
+
+require 'open3'
+
+class FSWatcher
+  def initialize(args:, on_ready:, on_event:, on_done:)
+    @args = args
+    @on_ready = on_ready
+    @on_event = on_event
+    @on_done = on_done
+    @wait_thread = nil
+    @mutex = Mutex.new
+  end
+
+  def running?
+    @mutex.synchronize do
+      @wait_thread&.alive?
+    end
+  end
+
+  def stop
+    @mutex.synchronize do
+      return false if @wait_thread.nil?
+
+
+
+    end
+  end
+
+  def start
+    @mutex.synchronize do
+      return false unless @wait_thread.nil?
+
+      i, o, e, t = Open3.popen3('fswatch', '-v', @args)
+      p [i, o, e, t]
+
+      i.close
+      read_stdout(o)
+      read_stderr(e)
+      @wait_thread = t
+
+      Thread.new do
+
+      end
+
+      true
+    end
+  end
+
+  def read_stdout(o)
+    Thread.new do
+      o.each_line do |text|
+        puts "trigger: #{text.chomp}"
+        @mutex.synchronize(&@on_event)
+      end
+      puts "trigger: EOF"
+    end
+  end
+
+  def read_stderr(e)
+    Thread.new do
+      e.each_line do |text|
+        puts "watcher: #{text.chomp}"
+        if @on_ready
+          puts "watcher is ready"
+          @on_ready.call
+          @on_ready = nil
+        end
+      end
+      puts "watcher: EOF"
+    end
+  end
+end
+
+class Child
+  def initialize(cmd_and_args:)
+  end
+end
+
+class Rebuild
+  attr_accessor :mutex, :resource, :dirty, :phase, :fswatcher, :child, :events
+  alias_method :dirty?, :dirty
+
+  def run
+    fswatch_args, cmd_and_args =
+      if (fswatch_end = ARGV.index('--'))
+        [ ARGV.take(fswatch_end), ARGV.drop(fswatch_end + 1) ]
+      else
+        [ ['.'], ARGV.to_a ]
+      end
+
+    self.mutex = Mutex.new
+    self.resource = ConditionVariable.new
+
+    # self.dirty = true
+    # self.phase = :running
+    self.events = []
+
+    # start an fswatcher on 'fswatch_args', setting 'dirty' on event
+    self.fswatcher = FSWatcher.new(
+      args: fswatch_args,
+      on_event: ->() { push_event(:dirty) }
+    )
+
+    self.child = Child.new(
+      cmd_and_args: cmd_and_args
+    )
+
+    %w[SIGINT SIGTERM SIGCHLD].each do |signal|
+      Signal.trap(signal) { Thread.new { push_event(signal) } }
+    end
+
+    while true
+      new_events = sync do
+        while events.empty?
+          resource.wait(mutex)
+        end
+
+        events.slice!(0..)
+      end
+
+      p new_events
+
+      break if new_events.include?('SIGTERM')
+    end
+  end
+
+  def sync(&block)
+    mutex.synchronize(&block)
+  end
+
+  def push_event(event)
+    sync do
+      events << event
+      resource.broadcast
+    end
+  end
+end
+
+Rebuild.new.run
+
+__END__
+
+start
++-> building
+    +-- sigint -> stopping-success
+    +-- dirty-event -> building-dirty
+    +-- fswatch-exit -> stopping-error
+    +-- child-exit ->
+
+
+
+
+
+
+
+
+
+
+# def stop_child
+#   if @started_pid
+#     Process.kill 'TERM', @started_pid
+#     Process.waitpid @started_pid
+#     puts "status=#{$?.inspect}"
+#     @started_pid = nil
+#   end
+# end
+#
+# @started_pid = nil
+
+
+class FSWatcher
+  def self.run(dirs)
+    super
+  end
+end
+
+mutex = Mutex.new
+resource = ConditionVariable.new
+
+dirty = true
+fswatcher = FSWatcher.start(
+  args: fswatch_args,
+  on_event: ->() do
+
+  end,
+  on_
+)
+  fswatch_args) do
+  mutex.synchronize do
+    dirty = true
+    resource.broadcast(mutex)
+  end
+end
+
+stop = false
+Signal.trap('INT') do
+  mutex.synchronize do
+    stop = true
+    resource.broadcast(mutex)
+  end
+end
+
+started_child = nil
+
+while true
+  break if mutex.synchronize { stop && started_child.nil? &&  }
+
+end
+
+
+
+
+
+
+
+
+
+__END__
+
+
+stop = false
+logs = []
+pr, pw = IO.pipe
+fswatch_pid = Process.spawn('fswatch', "-v", *fswatch_args, out: pw.fileno)
+pw.close
+puts "fswatch pid = #{fswatch_pid}"
+
+at_exit do
+  Process.waitpid @started_pid, 0 if @started_pid
+  Process.waitpid fswatch_pid, 0
+end
+
+Signal.trap('INT') do
+  stop = true
+  Process.kill('INT', @started_pid) if @started_pid
+  Signal.trap('INT', 'DEFAULT')
+end
+
+Signal.trap('CHLD') do
+  puts "got SIGCHLD"
+end
+
+Thread.new do
+  pr.each_line do |line|
+    @mutex.synchronize do
+      logs << line
+      @resource.broadcast
+    end
+  end
+  @mutex.synchronize do
+    stop = true
+    @resource.broadcast
+  end
+end
+
+while @mutex.synchronize { not stop }
+  sleep 0.2
+  @mutex.synchronize do
+    logs.each do |l|
+      puts "Trigger: #{l.chomp}"
+    end
+    logs.clear
+  end
+
+  system "ruler ; date"
+
+  stop_child
+  @started_pid = Process.spawn(*cmd_and_args)
+
+  @mutex.synchronize do
+    if stop
+      puts "Stopping"
+      break
+    end
+
+    break if logs.first
+
+    puts "Waiting..."
+    @resource.wait(@mutex)
+  end
+end
+
+stop_child
+puts "Done"

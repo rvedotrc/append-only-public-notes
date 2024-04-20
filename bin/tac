@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+all = $stdin.read
+
+added_nl =
+  if all.end_with?("\n")
+    false
+  else
+    all += "\n"
+    true
+  end
+
+all = all.lines.reverse.join
+
+all.chomp! if added_nl
+
+print all
