@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# path_to_bundle=$( which bundle )
+
+eval "$CHRUBY_INIT"
+
+# Can't, because of chruby siiiiiiigh
+# set -eu
+
+if [ "$1" = - ] ; then
+        version=$( cat .ruby-version )
+else
+        version="$1"
+fi
+
+shift
+
+if ! chruby "$version" ; then
+        echo "Couldn't switch to ruby $version" >&2
+
+        if [ -t 0 -a -t 1 ] ; then
+                read -p "Press enter to try to install it: "
+
+                set -e
+
+                (
+                        ruby-install "$version"
+                )
+
+                set +e
+
+                # Re-read available rubies
+                eval "$CHRUBY_INIT"
+
+                # Doesn't work; cached which versions are installed. Needs to be reinit'ed / flushed?
+                # Unless the above 'eval' has fixed it?
+                chruby "$version"
+
+                # or ignore_messages.httparty true
+                bundle config --global ignore_messages true
+
+                #£ https://stackoverflow.com/questions/67840691/ld-library-not-found-for-lzstd-while-bundle-install-for-mysql2-gem-ruby-on-mac
+                # brew install openssl@3 zstd
+                bundle config --global build.mysql2 "--with-opt-dir=$( brew --prefix openssl ) --with-ldflags=-L$( brew --prefix )/opt/zstd/lib"
+        else
+                exit 2
+        fi
+fi
+
+# { read username; read api_key; } < <( get-credentials jfrog username api_key )
+# bundle config set --global zdrepo.jfrog.io "$username:$api_key"
+
+# export PATH="$( dirname "$path_to_bundle" ):$PATH"
+
+exec "$@"

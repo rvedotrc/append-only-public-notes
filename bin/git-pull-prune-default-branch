@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -eu
+
+git checkout $( git default-branch )
+git pull --prune --ff-only
+git fetch --tags
+git delete-merged-branches

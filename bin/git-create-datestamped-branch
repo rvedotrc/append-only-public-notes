@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -eu
+
+if [ "$1" == "--scan" ] ; then
+        default_branch=$( git default-branch )
+
+        branches=$( git show-ref | grep ' refs/heads/zdrve/' | cut -d/ -f3- )
+        for branch in $branches ; do
+                if echo "$branch" | grep -q ^zdrve/[0-9][0-9][0-9][0-9]- ; then
+                        continue
+                fi
+
+                oldest_commit=$( git rev-list $( git merge-base $default_branch $branch )..$branch | tail -n1 )
+
+                if [ "$oldest_commit" = "" ] ; then
+                        git branch -d $branch
+                else
+                        start_date=$( git log -n 1 --format='%cs' "$oldest_commit" ) # yyyy-mm-dd
+                        new_branch=zdrve/$start_date-$( echo $branch | cut -d/ -f2- )
+                        git branch -m "$branch" "$new_branch"
+                fi
+        done
+
+        exit
+fi
+
+exec git checkout -b zdrve/$( date +'%Y-%m-%d' )-"$1"

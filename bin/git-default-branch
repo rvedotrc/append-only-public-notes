@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# gh repo view --json=defaultBranchRef | jq -r .defaultBranchRef.name
+# but that would be quite slow
+
+if git rev-parse origin/main >/dev/null 2>&1 ; then
+        echo main
+elif git rev-parse origin/master >/dev/null 2>&1 ; then
+        echo master
+else
+        echo "Default branch unknown, TODO allow via git config" >&2
+        exit 1
+fi

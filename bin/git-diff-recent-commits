@@ -1,0 +1,9 @@
+#!/bin/bash
+# "I'm sure I committed that change somewhere ..."
+# Walk through all recent commits (from the reflog) and git diff each one
+
+exec < <( exec git reflog )
+exec < <( exec cut -d' ' -f1 )
+exec < <( exec ruby -rset -e 's = Set.new; $stdin.each_line {|l| print l if s.add?(l) }' )
+exec < <( while read c ; do git diff --color=always $opts $c^..$c ; done )
+exec less -R

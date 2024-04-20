@@ -1,0 +1,63 @@
+#!/usr/bin/ruby
+
+args = ARGV
+
+require 'open3'
+
+IO.pipe do |r, w|
+  pid = Process.spawn(["ps", "ps"], "-Opid,ppid", *args, {out: w})
+  w.close
+
+  line = r.readline unless r.eof?
+  print line
+
+  if line && line.match(/^\s*([A-Z]+\s+)*$/)
+
+    headers = line.split(' ')
+    pid_index = headers.index("PID")
+    ppid_index = headers.index("PPID")
+    last_header_pos = line.index(/\b\w+\s*$/)
+
+    if pid_index && ppid_index && last_header_pos
+
+      lines = r.each_line.map do |text|
+        parts = text.split(' ')
+        {
+          text: text,
+          pid: parts[pid_index].to_i,
+          ppid: parts[ppid_index].to_i,
+        }
+      end
+
+      roots = lines.select do |line|
+        lines.none? { |other| other[:pid] == line[:ppid] }
+      end
+
+      queue = roots.map { |line| line.merge(depth: 0) }
+
+      while !queue.empty?
+        line = queue.shift
+
+        text = line[:text][0..last_header_pos-1] + "  " * line[:depth] + line[:text][last_header_pos..-1]
+        print text
+
+        to_add = *lines.select do |other|
+          other[:ppid] == line[:pid]
+        end.map do |other|
+          other.merge(depth: line[:depth] + 1)
+        end
+
+        queue.unshift *to_add
+      end
+    else
+      r.each_line {|line| print line}
+    end
+
+  else
+    r.each_line {|line| print line}
+  end
+
+  r.close
+  Process.waitpid(pid)
+  exit $?.exitstatus
+end

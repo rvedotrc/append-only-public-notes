@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+def walk(data, path)
+  case data
+  when Hash
+    puts "#{path}\tobject size = #{data.size}"
+    data.each do |key, value|
+      if key.match?(/^[a-zA-z]\w*$/)
+        walk(value, "#{path}.#{key}")
+      else
+        walk(value, "#{path}[#{key.inspect}]")
+      end
+    end
+  when Array
+    puts "#{path}\tarray size = #{data.size}"
+    data.each_with_index do |child, index|
+      walk(child, "#{path}[#{index}]")
+    end
+  else
+    puts "#{path}\t#{data.inspect}"
+  end
+end
+
+data = JSON.parse($stdin.read)
+walk(data, "$")

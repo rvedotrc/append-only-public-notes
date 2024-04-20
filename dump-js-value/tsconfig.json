@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "outDir": "dist",
+    "lib": [
+      "dom",
+      "es5",
+      "scripthost",
+      "es2021.weakref"
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+#!/bin/bash
+exec git rebase $( git merge-base-default-branch ) --onto $( git default-branch )

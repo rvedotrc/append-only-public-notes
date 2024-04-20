@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -eu
+
+def=$( git default-branch )
+
+if [ "$( cat .git/HEAD )" = "ref: refs/heads/$def" ] ; then
+  git pull --prune --ff-only
+else
+  git fetch --prune
+
+  if git merge-base --is-ancestor $def origin/$def ; then
+    git update-ref refs/heads/$def refs/remotes/origin/$def
+  else
+    echo "Declining to update $def to origin/$def since it's not an ancestor" >&2
+  fi
+fi

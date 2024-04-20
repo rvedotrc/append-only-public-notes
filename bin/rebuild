@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+
+def stop_child
+  if @started_pid
+    Process.kill 'TERM', @started_pid
+    Process.waitpid @started_pid
+    puts "status=#{$?.inspect}"
+    @started_pid = nil
+  end
+end
+
+no_wait = false
+@started_pid = nil
+if ARGV.first == '--no-wait'
+  no_wait = true
+  ARGV.shift
+end
+
+fswatch_end = ARGV.index('--')
+
+fswatch_args, cmd_and_args = if fswatch_end
+                               [ ARGV.take(fswatch_end), ARGV.drop(fswatch_end + 1) ]
+                             else
+                               [ ['.'], ARGV.to_a ]
+                             end
+
+@mutex = Mutex.new
+@resource = ConditionVariable.new
+
+stop = false
+logs = []
+pr, pw = IO.pipe
+pid = Process.spawn('fswatch', "-v", *fswatch_args, out: pw.fileno)
+pw.close
+puts "fswatch pid = #{pid}"
+
+Signal.trap('INT') do
+  stop = true
+  Signal.trap('INT', 'DEFAULT')
+end
+
+Thread.new do
+  pr.each_line do |line|
+    @mutex.synchronize do
+      logs << line
+      @resource.broadcast
+    end
+  end
+  @mutex.synchronize do
+    stop = true
+    @resource.broadcast
+  end
+end
+
+while @mutex.synchronize { not stop }
+  sleep 0.2
+  @mutex.synchronize do
+    logs.each do |l|
+      puts "Trigger: #{l.chomp}"
+    end
+    logs.clear
+  end
+
+  system "ruler ; date"
+
+  if no_wait
+    stop_child
+    @started_pid = Process.spawn(*cmd_and_args)
+  else
+    system *cmd_and_args
+    puts "status=#{$?.inspect}"
+  end
+
+  @mutex.synchronize do
+    if stop
+      puts "Stopping"
+      break
+    end
+
+    break if logs.first
+
+    puts "Waiting..."
+    @resource.wait(@mutex)
+  end
+end
+
+stop_child
+Process.wait(pid)
+puts "Done"

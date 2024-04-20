@@ -1,0 +1,55 @@
+#!/bin/bash
+
+DEFAULT_BRANCH=$( git default-branch )
+
+if [ "${1:-}" == --squash ] ; then
+        set -eu
+        git checkout $DEFAULT_BRANCH
+        git remote prune origin
+
+        git branch --merged \
+                | grep -v '*' \
+                | xargs echo git branch -d
+
+        git for-each-ref refs/heads/ '--format=%(refname:short)' \
+                | while read branch; do
+                        echo considering $branch
+
+                        mergeBase=$( git merge-base $DEFAULT_BRANCH $branch )
+                        # echo mergeBase=$mergeBase
+
+                        tree=$( git rev-parse $branch^{tree} )
+                        # echo tree=$tree
+
+                        # Make a new commit which has the same content as this branch,
+                        # based from the same branch point.  i.e. squash but don't
+                        # rebase onto a new master.
+                        # The dates are to avoid creating _different_ commits every time
+                        # this script is run.
+                        rebase=$(
+                          env \
+                            GIT_AUTHOR_DATE="2005-04-07T22:13:13.019" \
+                            GIT_COMMITTER_DATE="2005-04-07T22:13:13.019" \
+                            git commit-tree $tree -p $mergeBase -m _
+                        )
+                        # echo rebase=$rebase
+
+                        # See if we can find an equivalent commit in master's history
+                        matches=$( git cherry $DEFAULT_BRANCH $rebase $mergeBase )
+                        # echo matches: "$matches"
+                        if [[ "$matches" == '-'* ]] ; then
+                                git branch -D "$branch"
+                        fi
+
+                        echo
+                done
+        exit
+fi
+
+while read ref ; do
+        git branch -d "${ref/refs\/heads\/}"
+done < <(
+  git for-each-ref --format '%(refname)' --merged "$DEFAULT_BRANCH" \
+    | egrep '(zdrve/|snyk-)' \
+    | grep -v origin
+)

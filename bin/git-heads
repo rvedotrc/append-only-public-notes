@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Lists all heads, in a table showing:
+# - the number of commits diverged from the default branch
+# - the commit date
+# - the commit sha
+# - which refs point to that commit
+
+set -eu
+
+d=$( git default-branch )
+
+while read commit ref ; do
+  printf "%6d  " $( git rev-list "$commit...$d" | wc -l )
+  git log -n 1 --format="%cd %h %d" "$commit"
+done < <( git show-ref --heads ) | sort -k1.9 # i.e. sort by commit date
