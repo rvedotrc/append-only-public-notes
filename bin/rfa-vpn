@@ -2,56 +2,62 @@
 
 # See "$ZENDESK_CODE_DIR/kubectl_config/bin/trigger_vpn_connection.applescript"
 
-clickIf() {
-  local text=$1
-  local oppositeText=$2
+clickops() {
+  local main=$1
   local debug_log="-- log"
   osascript <<SCRIPT >/dev/null
     tell application "System Events" to tell process "GlobalProtect"
-
-      -- See if we can read the button text (maybe the GlobalProtect
-      -- window is already open)
-      local b
+      local dialog
 
       try
-        set b to title of button 2 of window 1
+        set dialog to first window whose first button's name is "Global Protect Options Menu"
       on error err
-        -- Couldn't read the button text, probably because
-        -- the GlobalProtect protect window isn't open
-        -- ("System Events encountered an error: Can't access window 1 of process "GlobalProtect". Invalid index.")
-        $debug_log "rfa-vpn: Got error: " & err
-        $debug_log "rfa-vpn: Clicking menu bar to see if that helps"
-
         click menu bar item 1 of menu bar 2
+        delay 1 # FIXME
+        set dialog to first window whose first button's name is "Global Protect Options Menu"
+      end
 
-        -- Polling loop up to ~2 seconds for the button to appear
-        local seq
-        set seq to 20
+      $debug_log dialog
 
-        repeat while seq > 0
-          try
-            set b to title of button 2 of window 1
-            set seq to 0
-          on error err
-            $debug_log "rfa-vpn: Got error " & err
-            delay 0.1
-            set seq to seq - 1
+      try
+        local connectButtons
+        local disconnectButtons
+        set connectButtons to every button of dialog whose name is "Connect"
+        set disconnectButtons to every button of dialog whose name is "Disconnect"
+        $debug_log connectButtons
+        $debug_log disconnectButtons
+
+        if "$main" is "connect"
+          if length of connectButtons is 1 then
+            click first item of connectButtons
+            # FIXME
+            # At this point we might want to poll the dialog for the disconnect button to appear
+            # or better, for the "connecting" stuff to disappear
+          else if length of disconnectButtons is 1 then
+            $debug_log "We're already connected - nothing to do"
+          else
+            error "No connect button to click"
           end
+        else if "$main" is "disconnect"
+          if length of disconnectButtons is 1 then
+            click first item of disconnectButtons
+            # FIXME
+            # At this point we might want to poll the dialog for the connect button to appear
+            # or better, for the "disconnecting" stuff to disappear
+          else if length of connectButtons is 1 then
+            $debug_log "We're already not connected - nothing to do"
+          else
+            error "No disconnect button to click"
+          end
+        else
+          error "Unrecognised command"
         end
+
+        click menu bar item 1 of menu bar 2 # close dialog
+      on error err
+        click menu bar item 1 of menu bar 2 # close dialog
       end
-
-      $debug_log "rfa-vpn: Button is available, and says '" & b & "'"
-
-      if (b is "$oppositeText")
-        $debug_log "rfa-vpn: Button already says $oppositeText, no click required"
-      else if (b is "$text")
-        $debug_log "rfa-vpn: Clicking '$text'"
-        click button 2 of window 1
-      end
-
-      $debug_log "rfa-vpn: Closing window"
-      click menu bar item 1 of menu bar 2
-    end tell
+    end
 SCRIPT
 }
 
@@ -82,14 +88,14 @@ if [ "$1" == "--is-up" ] ; then
 elif [ "${1:---up}" == "--up" ] ; then
   if ! isUp ; then
     networksetup -setv6LinkLocal Wi-Fi
-    clickIf Connect Disconnect
+    clickops connect
     if [ "$2" != "--no-wait" ] ; then
       waitForEval "isUp"
     fi
   fi
 elif [ "$1" == "--down" ] ; then
   if isUp ; then
-    clickIf Disconnect Connect
+    clickops disconnect
     if [ "$2" != "--no-wait" ] ; then
       waitForEval "! isUp"
     fi
