@@ -21,41 +21,99 @@
 
 -- set x to ["j", 7, {a: 9}, true, false, null]
 
-set indent to ""
-tell application "System Events" to tell process "GlobalProtect"
-    log [indent, me] -- me == script
-    set x to name
-    log [indent, x]
-
-    log [indent, "", "windows"]
-    set listx to every window
-    repeat with itemx in listx
-        log [indent, "  ", itemx]
+on dumpit(thing, indent, path)
+    try
+        log [indent & "p=" & path & " ", thing]
+    on error
+        log [indent & "p=" & path & " ", "???"]
+        log thing
     end
 
-    log [indent, "", "menus"]
-    set listx to every menu
-    repeat with itemx in listx
-        log [indent, "  ", itemx]
-    end
-
-    log [indent, "", "menu bars"]
-    set listx to every menu bar
-    repeat with itemx in listx
-        log [indent, "  ", itemx]
-        log itemx.name
-
-        log [indent, "    ", "items"]
-        set list2 to every menu bar item of itemx
-        repeat with i in list2
-          log [indent, "      ", i]
-        end
-    end
-
-    log [indent, "", "attributes"]
-    set listx to every attribute
-    repeat with itemx in listx
-        log [indent, "  ", itemx]
+    try
+        log [name, kind]
+    on error err
+        log err
     end
 end
 
+my dumpit(me, "", ".me")
+tell application "System Events" to tell process "GlobalProtect"
+    my dumpit(it, "", ".gp")
+end
+
+return
+
+log [me]
+-- log [me as text]
+log [name of me]
+log [name of me as text]
+log [it]
+
+
+tell application "System Events" to tell process "GlobalProtect"
+  log [me]
+  log [every attribute of it]
+  log [every attribute of me]
+     set listx to every attribute
+     repeat with itemx in listx
+         try
+           log "  ." & name of itemx as string & " = " & value of itemx as string
+         on error err
+           try
+             log ["  ." & name of itemx as string & " = ", value of item]
+           on error err
+             log ["  ." & name of itemx as string & " => ERROR: " & err]
+           end
+         end
+     end
+end
+
+-- my dumpit(me, "", "me")
+
+-- set indent to ""
+-- tell application "System Events" to tell process "GlobalProtect"
+--     log [indent, me] -- me == script
+--     set x to name
+--     log [indent, x]
+--
+--     log [indent, "", "windows"]
+--     set listx to every window
+--     repeat with itemx in listx
+--         log [indent, "  ", itemx]
+--         my dumpit(itemx)
+--     end
+--
+--     log [indent, "", "menus"]
+--     set listx to every menu
+--     repeat with itemx in listx
+--         log [indent, "  ", itemx]
+--         my dumpit(itemx)
+--     end
+--
+--     log [indent, "", "menu bars"]
+--     set listx to every menu bar
+--     repeat with itemx in listx
+--         log [indent, "  ", itemx]
+--         my dumpit(itemx)
+--         -- log itemx.name
+--
+--         log [indent, "    ", "items"]
+--         set list2 to every menu bar item of itemx
+--         repeat with i in list2
+--           log [indent, "      ", i]
+--           set attrs to every attribute of i
+--           repeat with attr in attrs
+--           set n to name of attr
+--           set v to value of attr
+--           log [indent, "        ", n, v]
+--           end
+--         end
+--     end
+--
+--     log [indent, "", "attributes"]
+--     set listx to every attribute
+--     repeat with itemx in listx
+--         log [indent, "  ", itemx]
+--     end
+-- end
+--

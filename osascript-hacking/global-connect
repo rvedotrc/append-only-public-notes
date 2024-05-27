@@ -1,0 +1,9 @@
+tell application "System Events" to tell process "GlobalProtect"
+    -- set list to every window
+    -- log ["" & name of window 1]
+    -- log [window 2]
+    -- log [window 200]
+
+
+    log [name of x in every menu bar]
+end tell
