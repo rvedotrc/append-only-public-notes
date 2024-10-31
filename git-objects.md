@@ -8,13 +8,7 @@ The bits of git that I sometimes struggle to remember / find.
 
 ### directory-finding
 
-`git rev-parse --show-toplevel` - top directory (fails in a bare repo)
-
-`git rev-parse --git-dir` - usually top directory plus `/.git`
-
-`git rev-parse --show-prefix` - the empty string if you're at the root, `foo/` if you're in the `foo/` directory, and so on
-
-All of the above fail if you're neither in a worktree nor a git directory
+See [git-directories](./git-directories.md).
 
 ## Manually adding a blob
 
@@ -87,7 +81,7 @@ git update-ref refs/heads/hello $(
 
 In additional worktrees, `.git` isn't a directory, it's a text file:
 
-```shell
+```text
 gitdir: /private/tmp/main-checkout/.git/worktrees/my-worktree
 ```
 
