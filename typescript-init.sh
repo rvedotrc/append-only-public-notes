@@ -30,14 +30,14 @@ setup_typescript() {
         --target ESNext \
         --module NodeNext \
         --sourceMap \
-        --rootDir src \
+        --rootDir . \
         --outDir dist \
         --declaration \
         --strict \
         --esModuleInterop \
         --resolveJsonModule
 
-    pnpm pkg set 'exports[.]'=./dist/hello.js
+    pnpm pkg set 'exports[.]'=./dist/src/hello.js
 
     sed -i "" -e 's#// "outDir": "./",#"outDir": "dist", #' tsconfig.json
     echo /dist/ >> .gitignore
@@ -50,7 +50,7 @@ setup_typescript() {
 
     pnpm pkg set scripts.build=tsc
     pnpm run build
-    node dist/hello.js
+    node dist/src/hello.js
 
     git add package.json pnpm-lock.yaml
     git commit -m "Add typescript"
@@ -115,6 +115,7 @@ CONF
     git add eslint.config.mjs
     pnpm pkg set scripts.test:lint=eslint
     pnpm run test:lint
+    git add package.json
     git commit -m "Add eslint"
 }
 
