@@ -8,8 +8,8 @@ setup_git() {
 }
 
 setup_asdf() {
-    asdf local nodejs 22.9.0
-    asdf local pnpm 9.12.0
+    asdf local nodejs 23.3.0
+    asdf local pnpm 9.15.3
     git add .tool-versions
     git commit -m "Add asdf"
 }
@@ -55,7 +55,6 @@ setup_typescript() {
     git add package.json pnpm-lock.yaml
     git commit -m "Add typescript"
 }
-
 
 setup_prettier() {
     pnpm install --save-dev prettier
@@ -107,7 +106,24 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/**", "eslint.config.mjs"],
+    rules: {
+      "no-irregular-whitespace": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          args: "all",
+          argsIgnorePattern: "^_",
+          caughtErrors: "all",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
+    ignores: ["coverage/**", "data/**", "dist/**", "eslint.config.mjs"],
   },
 );
 CONF
@@ -119,12 +135,39 @@ CONF
     git commit -m "Add eslint"
 }
 
+setup_tests() {
+    pnpm install --save-dev concurrently c8
+    pnpm pkg set scripts.test="concurrently --group pnpm:test:*"
+    pnpm pkg set scripts.test:unit="c8 node --enable-source-maps --experimental-test-coverage --test './dist/spec/**/*.js'"
+
+    mkdir spec
+    cat <<'JS' > ./spec/hello.ts
+import t from "node:test";
+// import hello from "../src/hello.js";
+
+void t.suite("hello", () => {
+  void t.test("world", async () => {
+    // await hello();
+  });
+});
+JS
+    pnpm format
+    pnpm build
+    pnpm test
+
+    echo coverage/ >> .gitignore
+
+    git add spec
+    git commit -a -m "Add tests"
+}
+
 setup_git
 setup_asdf
 setup_pnpm
 setup_typescript
 setup_prettier
 setup_eslint
+setup_tests
 
 ln -s .. node_modules/quickhack
 node --input-type module -e 'console.log(await import("quickhack"))'
