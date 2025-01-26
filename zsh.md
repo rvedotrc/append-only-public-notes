@@ -12,7 +12,6 @@ typeset -a name
 typeset -A name
 ```
 
-
 ```shell
 set -A name value ...
 name=(value ...)
@@ -36,12 +35,29 @@ name+=([key]=value ...)
 
 ## List command completions
 
+It's in `_comps`.
+
 ```shell
-for command completion in ${(kv)_comps:#-*(-|-,*)}                                                                                                        ✔  08:46:30 
+for command completion in ${(okv)_comps:#-*(-|-,*)}
 do
     printf "%-32s %s\n" $command $completion
-done | sort
+done
 ```
 
 `${_comps}` is the completions associative array. `(kv)` lists both keys and values.
 
+To remove the completion for command `foo`:
+
+```
+unset '_comps[foo]'
+```
+
+## List functions
+
+It's in `functions`.
+
+Names, ordered:
+
+```shell
+print -l ${(ok)functions}
+```
